@@ -163,7 +163,7 @@ const log = $("log"), input = $("input"), composer = $("composer"), panel = $("p
    Options go to createLiquidGlass(); vars are Nordify's --lg-* CSS custom
    properties. A var only overrides Nordify's own value once you move its slider.
    ===================================================================== */
-const AnswerBot_DEFAULTS = { radius: 26, rim: 1.1, blur: 0.5, saturate: 1.1, reflect: true, reflectStrength: 2.5, dark: true, vars: {} };
+const AnswerBot_DEFAULTS = { radius: 26, rim: 1.1, blur: 2, saturate: 1.1, reflect: true, reflectStrength: 2.5, dark: true, vars: {} };
 const NORDIFY_DEFAULTS = { radius: 30, rim: 1.3, blur: 2.5, saturate: 1.1, reflect: true, reflectStrength: 2.5, dark: false, vars: {} };
 const KEY = "AnswerBot.settings.v1";
 let S = { ...structuredClone(AnswerBot_DEFAULTS), bg: { id: "city" } };
