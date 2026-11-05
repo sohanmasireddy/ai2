@@ -116,7 +116,7 @@
 </head>
 <body>
 
-<div id="unsupported">Browser not supported. Switch to a Chromium based browser. </div>
+<div id="unsupported">Switch to a Chromium based browser!</div>
 
 <div id="log">
   <div class="empty"><b>AnswerBot</b>Ask anything. Attach an image or tap the mic.</div>
@@ -163,8 +163,17 @@ const log = $("log"), input = $("input"), composer = $("composer"), panel = $("p
    Options go to createLiquidGlass(); vars are Nordify's --lg-* CSS custom
    properties. A var only overrides Nordify's own value once you move its slider.
    ===================================================================== */
-const AnswerBot_DEFAULTS = { radius: 26, rim: 1.1, blur: 2, saturate: 1.1, reflect: true, reflectStrength: 2.5, dark: true, vars: {} };
-const NORDIFY_DEFAULTS = { radius: 30, rim: 1.3, blur: 2.5, saturate: 1.1, reflect: true, reflectStrength: 2.5, dark: false, vars: {} };
+const AnswerBot_DEFAULTS = {
+  radius: 23, rim: 3, blur: 2, saturate: 1, reflect: true, reflectStrength: 2.5, dark: true,
+  vars: {
+    "--lg-glint-exp": 0.6, "--lg-glint-sat": 0.5,
+    "--lg-rim-exp": 1.8, "--lg-rim-sat": 3,
+    "--lg-fold-exp": 1, "--lg-fold-sat": 0.8,
+    "--lg-rim-w": 0, "--lg-rim-fade": 0,
+    "--lg-spec": 0, "--lg-underlay": 0,
+    "--lg-shadow-o": 0, "--lg-caustic-o": 0,
+  },
+};
 const KEY = "AnswerBot.settings.v1";
 let S = { ...structuredClone(AnswerBot_DEFAULTS), bg: { id: "city" } };
 let uploadData = null;
@@ -350,13 +359,6 @@ heading("Light & edge (CSS variables)");
 for (const d of VAR_DEFS) {
   addSlider(d, () => S.vars[d.k] ?? (S.dark ? d.dark : d.light), (v) => { S.vars[d.k] = v; save(); scheduleVars(); });
 }
-const btns = h("div", "btns");
-const bAnswerBot = h("button", "btn", "AnswerBot look"), bNord = h("button", "btn", "Nordify defaults");
-const resetTo = (defs) => { S = { ...structuredClone(defs), bg: S.bg }; save(); syncAll(); applyVars(); rebuild(); };
-bAnswerBot.onclick = () => resetTo(AnswerBot_DEFAULTS);
-bNord.onclick = () => resetTo(NORDIFY_DEFAULTS);
-btns.append(bAnswerBot, bNord); panel.append(btns);
-panel.append(h("p", "note", "Nordify defaults = the values in its own code. Sliders for the CSS variables start at Nordify’s numbers for the current light/dark tuning."));
 
 $("gear").onclick = () => panel.classList.toggle("open");
 addEventListener("keydown", (e) => { if (e.key === "Escape") panel.classList.remove("open"); });
