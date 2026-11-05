@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>AnswerBot</title>
+<script>
+  /* Chromium-only: navigator.userAgentData exists in Chromium browsers only (same test Nordify uses). */
+  if (!("userAgentData" in navigator)) document.documentElement.classList.add("unsupported");
+</script>
 <link rel="stylesheet" href="./glass/liquid-glass.css">
 <style>
   :root { --text: #f4f7ff; --muted: rgba(244,247,255,.68); }
@@ -16,10 +20,20 @@
     background: #070b18 url("city.png") center / cover no-repeat fixed;
   }
 
+  /* Non-Chromium browsers: plain white screen with a message, everything else hidden */
+  #unsupported { display: none; }
+  html.unsupported, html.unsupported body { background: #fff; }
+  html.unsupported body > *:not(#unsupported) { display: none !important; }
+  html.unsupported #unsupported {
+    display: flex; position: fixed; inset: 0; align-items: center; justify-content: center;
+    padding: 24px; text-align: center; background: #fff; color: #111;
+    font-size: clamp(22px, 4vw, 34px); font-weight: 650;
+  }
+
   /* The PAGE scrolls (like Nordify's demo), so messages slide under the fixed prompt box and get refracted.
      Nordify rule: no filter / opacity / mask / overflow:hidden / isolation on glass elements or their ancestors. */
   #log {
-    position: relative;               /* the glass covers are positioned against this */
+    position: relative;
     max-width: 820px; margin: 0 auto;
     min-height: 100dvh;
     display: flex; flex-direction: column; gap: 14px;
@@ -29,7 +43,7 @@
   .empty b { display: block; font-size: 36px; color: var(--text); letter-spacing: .06em; margin-bottom: 6px; }
 
   .msg {
-    max-width: 85%; padding: 12px 18px; line-height: 1.5; border-radius: 22px;
+    max-width: 85%; padding: 12px 18px; line-height: 1.5; border-radius: 26px;
     white-space: pre-wrap; word-wrap: break-word; text-shadow: 0 1px 8px rgba(0,0,0,.4);
   }
   .msg.user { align-self: flex-end; }
@@ -37,12 +51,11 @@
   .msg img { display: block; max-width: 220px; max-height: 220px; border-radius: 14px; margin-bottom: 8px; }
   .msg.err { color: #ffd0d0; }
 
-  /* Prompt box: fixed at the bottom, centred with left/right + auto margins (no transform: it would break the glass). */
   #composer {
     position: fixed; z-index: 10;
     left: 14px; right: 14px; max-width: 792px; margin: 0 auto;
     bottom: max(14px, env(safe-area-inset-bottom));
-    padding: 8px 10px; border-radius: 30px;
+    padding: 8px 10px; border-radius: 26px;
     display: flex; flex-direction: column; gap: 6px;
   }
   #preview { display: none; gap: 8px; padding: 4px 8px 0; align-items: center; font-size: 12px; color: var(--muted); }
@@ -56,7 +69,6 @@
   textarea::-webkit-scrollbar { display: none; width: 0; height: 0; }
   textarea::placeholder { color: var(--muted); }
 
-  /* Plain icon buttons: no circle, no background */
   .icon {
     width: 42px; height: 44px; flex: none; padding: 0; display: grid; place-items: center;
     background: none; border: 0; color: var(--text); cursor: pointer; opacity: .9;
@@ -65,16 +77,55 @@
   .icon:hover { opacity: 1; }
   .icon:active { transform: scale(.9); }
   .icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-  .icon.rec { color: #ff3040; opacity: 1; }   /* red while dictating (no animation: animating inside the glass makes it flicker) */
+  .icon.rec { color: #ff3040; opacity: 1; }
   #preview .icon { width: 28px; height: 28px; }
   #preview .icon svg { width: 16px; height: 16px; }
+
+  /* Settings button + panel (the panel is NOT an ancestor of any glass element) */
+  #gear { position: fixed; z-index: 30; top: max(12px, env(safe-area-inset-top)); right: 12px; filter: drop-shadow(0 1px 6px rgba(0,0,0,.7)); }
+  #panel {
+    position: fixed; z-index: 25; display: none;
+    top: calc(max(12px, env(safe-area-inset-top)) + 48px); right: 12px;
+    width: min(350px, calc(100vw - 24px)); max-height: calc(100dvh - 120px); overflow-y: auto; overscroll-behavior: contain;
+    padding: 14px 16px 18px; border-radius: 20px; font-size: 13px;
+    background: rgba(12,15,28,.86); border: 1px solid rgba(255,255,255,.18);
+    -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+    box-shadow: 0 20px 50px rgba(0,0,0,.45);
+  }
+  #panel.open { display: block; }
+  #panel h2 { margin: 16px 0 6px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  #panel h2:first-child { margin-top: 0; }
+  .swatches { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .swatch {
+    height: 52px; border-radius: 12px; border: 2px solid transparent; cursor: pointer; color: #fff;
+    font: inherit; font-size: 11px; text-shadow: 0 1px 4px rgba(0,0,0,.8); display: grid; place-items: end start; padding: 5px 7px;
+    background-size: cover; background-position: center;
+  }
+  .swatch.on { border-color: #8fb4ff; }
+  .srow { display: grid; gap: 2px; margin: 9px 0; }
+  .shead { display: flex; justify-content: space-between; color: var(--muted); }
+  .shead output { color: var(--text); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: #8fb4ff; margin: 0; }
+  .check { display: flex; align-items: center; gap: 8px; margin: 9px 0; color: var(--text); }
+  .btns { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .btn { flex: 1; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: var(--text); font: inherit; cursor: pointer; }
+  .btn:hover { background: rgba(255,255,255,.16); }
+  .note { color: var(--muted); font-size: 11.5px; margin: 6px 0 0; line-height: 1.4; }
+  input[type=color] { width: 100%; height: 34px; border: 0; background: none; padding: 0; margin-top: 8px; cursor: pointer; }
 </style>
 </head>
 <body>
 
+<div id="unsupported">Switch to a Chromium based browser!</div>
+
 <div id="log">
   <div class="empty"><b>AnswerBot</b>Ask anything. Attach an image or tap the mic.</div>
 </div>
+
+<button class="icon" id="gear" title="Settings" aria-label="Settings">
+  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5h0a1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+</button>
+<div id="panel"></div>
 
 <div id="composer">
   <div id="preview"><img id="prevImg" alt=""><span id="prevInfo"></span>
@@ -97,43 +148,126 @@
   </div>
 </div>
 <input type="file" id="file" accept="image/*" hidden>
+<input type="file" id="bgfile" accept="image/*" hidden>
 
 <script type="module">
 import { createLiquidGlass } from "./glass/liquid-glass.js";
 
+if (document.documentElement.classList.contains("unsupported")) throw new Error("AnswerBot needs a Chromium based browser.");
+
 const $ = (id) => document.getElementById(id);
-const log = $("log"), input = $("input"), composer = $("composer");
+const log = $("log"), input = $("input"), composer = $("composer"), panel = $("panel");
 
-/* ---------- Nordify liquid glass: same settings everywhere, so the frost matches ---------- */
-const GLASS = { rim: 1.1, blur: 0.5, reflect: true };   // blur = frost in px (lower = clearer)
-function makeGlass(el, radius) {
+/* =====================================================================
+   Settings state
+   Options go to createLiquidGlass(); vars are Nordify's --lg-* CSS custom
+   properties. A var only overrides Nordify's own value once you move its slider.
+   ===================================================================== */
+const AnswerBot_DEFAULTS = { radius: 26, rim: 1.1, blur: 0.5, saturate: 1.1, reflect: true, reflectStrength: 2.5, dark: true, vars: {} };
+const NORDIFY_DEFAULTS = { radius: 30, rim: 1.3, blur: 2.5, saturate: 1.1, reflect: true, reflectStrength: 2.5, dark: false, vars: {} };
+const KEY = "AnswerBot.settings.v1";
+let S = { ...structuredClone(AnswerBot_DEFAULTS), bg: { id: "city" } };
+let uploadData = null;
+try {
+  const raw = localStorage.getItem(KEY);
+  if (raw) S = { ...S, ...JSON.parse(raw) };
+  uploadData = localStorage.getItem(KEY + ".bg");
+  if (S.bg.id === "upload" && !uploadData) S.bg = { id: "city" };
+} catch {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch {} };
+
+const OPT_DEFS = [
+  { k: "radius", label: "Corner radius", min: 8, max: 40, step: 1, unit: "px" },
+  { k: "rim", label: "Rim", min: 0.2, max: 3, step: 0.05 },
+  { k: "blur", label: "Frost (blur)", min: 0, max: 12, step: 0.1, unit: "px" },
+  { k: "saturate", label: "Saturation", min: 0.5, max: 2.5, step: 0.05 },
+  { k: "reflectStrength", label: "Reflection strength", min: 0, max: 6, step: 0.1 },
+];
+/* light / dark = Nordify's own values for each tuning (from liquid-glass.css) */
+const VAR_DEFS = [
+  { k: "--lg-glint-exp", label: "Lit edge exposure (glint)", min: 0.6, max: 2.4, step: 0.01, light: 1.35, dark: 1.45 },
+  { k: "--lg-glint-sat", label: "Lit edge saturation (glint)", min: 0.5, max: 4, step: 0.05, light: 3.1, dark: 2.0 },
+  { k: "--lg-rim-exp", label: "Rim exposure", min: 0.4, max: 1.8, step: 0.01, light: 0.84, dark: 1.25 },
+  { k: "--lg-rim-sat", label: "Rim saturation", min: 0.5, max: 3, step: 0.05, light: 2.2, dark: 1.3 },
+  { k: "--lg-fold-exp", label: "Fold exposure", min: 0.8, max: 1.6, step: 0.01, light: 1.08, dark: 1.08 },
+  { k: "--lg-fold-sat", label: "Fold saturation", min: 0.8, max: 2.2, step: 0.01, light: 1.3, dark: 1.3 },
+  { k: "--lg-rim-w", label: "Rim line width", min: 0, max: 4, step: 0.1, unit: "px", light: 0.7, dark: 0.7 },
+  { k: "--lg-rim-fade", label: "Rim line fade", min: 0, max: 8, step: 0.1, unit: "px", light: 2, dark: 2 },
+  { k: "--lg-spec", label: "Edge reflection (spec)", min: 0, max: 0.7, step: 0.01, light: 0.13, dark: 0.38 },
+  { k: "--lg-underlay", label: "White veil (underlay)", min: 0, max: 0.5, step: 0.01, light: 0.14, dark: 0.03 },
+  { k: "--lg-shadow-o", label: "Shadow opacity", min: 0, max: 1, step: 0.01, light: 0.35, dark: 0 },
+  { k: "--lg-caustic-o", label: "Caustic opacity", min: 0, max: 1, step: 0.01, light: 0.7, dark: 0 },
+];
+const VAR_BY_KEY = Object.fromEntries(VAR_DEFS.map((d) => [d.k, d]));
+
+/* =====================================================================
+   Nordify liquid glass on the prompt box and every message
+   ===================================================================== */
+const hosts = () => [composer, ...log.querySelectorAll(".msg")];
+
+function makeGlass(el) {
+  if (S.dark) el.setAttribute("data-lg-dark", ""); else el.removeAttribute("data-lg-dark");
   try {
-    el.setAttribute("data-lg-dark", "");   // city.png is dark; delete this line if the glass looks too faint
-    return createLiquidGlass(el, { radius, ...GLASS });
-  } catch (e) { console.warn("Liquid glass failed:", e); return null; }
+    el._g = createLiquidGlass(el, {
+      radius: S.radius, rim: S.rim, blur: S.blur, saturate: S.saturate,
+      reflect: S.reflect, reflectStrength: S.reflectStrength,
+    });
+  } catch (e) { console.warn("Liquid glass failed:", e); el._g = null; }
 }
-makeGlass(composer, 30);
+makeGlass(composer);
 
-/* Messages: glass is built only for bubbles near the screen and removed when they are far away (keeps long chats fast). */
+/* Messages: glass only while near the screen (keeps long chats fast) */
 const io = new IntersectionObserver((entries) => {
   for (const en of entries) {
     const el = en.target;
-    if (en.isIntersecting) { if (!el._g) el._g = makeGlass(el, 22); }
+    if (en.isIntersecting) { if (!el._g) makeGlass(el); }
     else if (el._g) { el._g.destroy(); el._g = null; }
   }
 }, { rootMargin: "700px 0px" });
 
-/* Keep room under the messages for the prompt box */
+/* Option changes need the glass rebuilt (they are constructor options) */
+let rebuildTimer;
+function rebuild() {
+  for (const h of hosts()) if (h._g) { h._g.destroy(); h._g = null; makeGlass(h); }
+}
+const scheduleRebuild = () => { clearTimeout(rebuildTimer); rebuildTimer = setTimeout(rebuild, 120); };
+
+/* CSS variable overrides: one rule on the host and on its cover sibling */
+const varStyle = document.createElement("style");
+document.head.append(varStyle);
+let varRaf = 0;
+function applyVars() {
+  const decl = Object.entries(S.vars).map(([k, v]) => `${k}:${v}${VAR_BY_KEY[k]?.unit || ""}`).join(";");
+  varStyle.textContent = decl ? `.lg-host,.lg-host + .lg-cover{${decl}}` : "";
+  for (const h of hosts()) h._g?.update();
+}
+const scheduleVars = () => { cancelAnimationFrame(varRaf); varRaf = requestAnimationFrame(applyVars); };
+
 new ResizeObserver(() => document.documentElement.style.setProperty("--comp-h", composer.offsetHeight + "px")).observe(composer);
 
-const toBottom = () => scrollTo(0, document.documentElement.scrollHeight);
-const nearBottom = () => innerHeight + scrollY >= document.documentElement.scrollHeight - 160;
+/* =====================================================================
+   Background
+   ===================================================================== */
+const BGS = [
+  { id: "city", name: "City", css: 'url("city.png") center / cover no-repeat' },
+  { id: "aurora", name: "Aurora", css: "linear-gradient(135deg,#0b1d2e 0%,#1b5e6b 35%,#6a3cc4 70%,#d05ce3 100%)" },
+  { id: "sunset", name: "Sunset", css: "linear-gradient(160deg,#1b1038 0%,#7a2a6e 40%,#ff6b4a 80%,#ffc46b 100%)" },
+  { id: "ocean", name: "Ocean", css: "linear-gradient(160deg,#021b3a 0%,#0a4f8f 50%,#27c2c9 100%)" },
+  { id: "forest", name: "Forest", css: "linear-gradient(160deg,#06140f 0%,#14513a 55%,#8bd18a 100%)" },
+  { id: "midnight", name: "Midnight", css: "linear-gradient(160deg,#05060d 0%,#14183a 60%,#2b2f6b 100%)" },
+];
+function applyBg() {
+  const b = S.bg;
+  let css;
+  if (b.id === "color") css = b.color || "#101828";
+  else if (b.id === "upload" && uploadData) css = `url("${uploadData}") center / cover no-repeat fixed`;
+  else css = (BGS.find((x) => x.id === b.id) || BGS[0]).css + " fixed";
+  document.body.style.background = css;
+  panel.querySelectorAll(".swatch").forEach((s) => s.classList.toggle("on", s.dataset.id === b.id));
+  for (const h of hosts()) h._g?.refresh?.();
+}
 
-let history = [];
-let pendingImage = null;
-let busy = false;
-
-/* ---------- Image compressor: max 1024px, JPEG 0.72 ---------- */
+/* Image compressor: max side px, JPEG quality */
 async function compressImage(file, maxSide = 1024, quality = 0.72) {
   const bmp = await createImageBitmap(file);
   const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
@@ -147,6 +281,97 @@ async function compressImage(file, maxSide = 1024, quality = 0.72) {
   return { dataUrl, base64: dataUrl.split(",")[1], bytes: Math.round(dataUrl.length * 0.75) };
 }
 const kb = (n) => (n / 1024).toFixed(0) + " KB";
+
+/* =====================================================================
+   Settings panel
+   ===================================================================== */
+const syncers = [];
+const fmt = (v) => String(Math.round(v * 100) / 100);
+function h(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; }
+function heading(t) { panel.append(h("h2", "", t)); }
+
+function addSlider(def, get, set) {
+  const row = h("label", "srow"), head = h("span", "shead"), name = h("span", "", def.label), out = h("output");
+  head.append(name, out);
+  const inp = h("input"); inp.type = "range"; inp.min = def.min; inp.max = def.max; inp.step = def.step;
+  const show = (v) => { out.textContent = fmt(v) + (def.unit || ""); };
+  inp.oninput = () => { const v = parseFloat(inp.value); set(v); show(v); };
+  row.append(head, inp); panel.append(row);
+  syncers.push(() => { const v = get(); inp.value = v; show(v); });
+}
+function addCheck(label, get, set) {
+  const row = h("label", "check"), cb = h("input"); cb.type = "checkbox";
+  cb.onchange = () => set(cb.checked);
+  row.append(cb, document.createTextNode(label)); panel.append(row);
+  syncers.push(() => { cb.checked = get(); });
+}
+const syncAll = () => syncers.forEach((f) => f());
+
+/* Background section */
+heading("Background");
+const grid = h("div", "swatches");
+for (const b of BGS) {
+  const s = h("button", "swatch", b.name); s.dataset.id = b.id; s.style.background = b.css;
+  s.onclick = () => { S.bg = { id: b.id }; save(); applyBg(); };
+  grid.append(s);
+}
+const up = h("button", "swatch", "Upload…"); up.dataset.id = "upload"; up.style.background = "rgba(255,255,255,.1)";
+up.onclick = () => $("bgfile").click();
+grid.append(up);
+panel.append(grid);
+const color = h("input"); color.type = "color"; color.value = "#101828"; color.title = "Solid colour";
+color.oninput = () => { S.bg = { id: "color", color: color.value }; save(); applyBg(); };
+panel.append(color);
+const bgNote = h("p", "note", "");
+panel.append(bgNote);
+$("bgfile").onchange = async (e) => {
+  const f = e.target.files[0]; e.target.value = "";
+  if (!f) return;
+  try {
+    const out = await compressImage(f, 1920, 0.82);
+    uploadData = out.dataUrl; S.bg = { id: "upload" }; bgNote.textContent = "";
+    try { localStorage.setItem(KEY + ".bg", uploadData); } catch { bgNote.textContent = "Too big to remember after a refresh; it stays until you reload."; }
+    save(); applyBg();
+  } catch { alert("Couldn't read that image."); }
+};
+
+/* Nordify createLiquidGlass options */
+heading("Liquid glass options");
+for (const d of OPT_DEFS) addSlider(d, () => S[d.k], (v) => { S[d.k] = v; save(); scheduleRebuild(); });
+addCheck("Reflect (mirror surroundings into the rim)", () => S.reflect, (v) => { S.reflect = v; save(); rebuild(); });
+addCheck("Dark tuning (data-lg-dark)", () => S.dark, (v) => {
+  S.dark = v; save();
+  for (const el of hosts()) { if (v) el.setAttribute("data-lg-dark", ""); else el.removeAttribute("data-lg-dark"); }
+  syncAll(); scheduleVars();
+});
+
+/* Nordify CSS custom properties */
+heading("Light & edge (CSS variables)");
+for (const d of VAR_DEFS) {
+  addSlider(d, () => S.vars[d.k] ?? (S.dark ? d.dark : d.light), (v) => { S.vars[d.k] = v; save(); scheduleVars(); });
+}
+const btns = h("div", "btns");
+const bAnswerBot = h("button", "btn", "AnswerBot look"), bNord = h("button", "btn", "Nordify defaults");
+const resetTo = (defs) => { S = { ...structuredClone(defs), bg: S.bg }; save(); syncAll(); applyVars(); rebuild(); };
+bAnswerBot.onclick = () => resetTo(AnswerBot_DEFAULTS);
+bNord.onclick = () => resetTo(NORDIFY_DEFAULTS);
+btns.append(bAnswerBot, bNord); panel.append(btns);
+panel.append(h("p", "note", "Nordify defaults = the values in its own code. Sliders for the CSS variables start at Nordify’s numbers for the current light/dark tuning."));
+
+$("gear").onclick = () => panel.classList.toggle("open");
+addEventListener("keydown", (e) => { if (e.key === "Escape") panel.classList.remove("open"); });
+
+syncAll(); applyVars(); applyBg();
+
+/* =====================================================================
+   Chat
+   ===================================================================== */
+const toBottom = () => scrollTo(0, document.documentElement.scrollHeight);
+const nearBottom = () => innerHeight + scrollY >= document.documentElement.scrollHeight - 160;
+
+let history = [];
+let pendingImage = null;
+let busy = false;
 
 $("attach").onclick = () => $("file").click();
 $("file").onchange = async (e) => {
@@ -162,7 +387,7 @@ $("file").onchange = async (e) => {
 };
 $("prevX").onclick = () => { pendingImage = null; $("preview").style.display = "none"; };
 
-/* ---------- Dictation ---------- */
+/* Dictation */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, listening = false, baseText = "";
 if (!SR) { $("mic").style.display = "none"; }
@@ -183,7 +408,6 @@ else {
   };
 }
 
-/* ---------- Chat ---------- */
 function autosize() {
   input.style.height = "44px";
   input.style.height = Math.min(input.scrollHeight, 160) + "px";
